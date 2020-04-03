@@ -1,0 +1,536 @@
+C51 COMPILER V9.56.0.0   MENSUOMIMA                                                        07/30/2019 17:55:10 PAGE 1   
+
+
+C51 COMPILER V9.56.0.0, COMPILATION OF MODULE MENSUOMIMA
+OBJECT MODULE PLACED IN mensuomima.OBJ
+COMPILER INVOKED BY: D:\Keil_v5\C51\BIN\C51.EXE mensuomima.c OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEXTEND
+
+line level    source
+
+   1          /*——————密码门锁————————*/
+   2          /*——————密码86445131——————*/
+   3          
+   4          #include<reg52.h>
+   5          
+   6          #define uchar unsigned char
+   7          #define uint unsigned int
+   8          
+   9          sbit l1=P2^0;
+  10          sbit bump=P1^3; //蜂鸣器控制
+  11          sbit IN1=P1^0;//驱动引脚
+  12          sbit IN2=P1^1;
+  13          sbit rs=P2^3;     //液晶屏控制位
+  14          sbit rw=P2^4;     //读写选择端
+  15          sbit lcden=P2^5;  //使能控制端
+  16          
+  17          /**********显示内容**************************/
+  18          uchar code xianshi0[]="input  password:";
+  19          uchar code xianshi1[]="please come in!";
+  20          uchar code xianshi2[]="close the door!";
+  21          uchar code xianshi3[]="*";
+  22          uchar code xianshi4[]=" you are thief!";
+  23          uchar code xianshi5[]="  first error!";
+  24          uchar code xianshi6[]="  second error!";
+  25          uchar code xianshi7[]="  third error!!";
+  26          uchar code xianshi8[]="  Good Bye!!";
+  27          uchar code xianshi9[]=" Wait a moment! ";
+  28          static uchar table[8]; //给按键输入留取存储空间
+  29          static uchar mima[8]={8,6,4,4,5,1,3,1};
+  30          uchar num=0,etimes=0,s=0;
+  31          bit cpflog=0,mimaqueren=0;
+  32          
+  33          void compare(); //密码比较函数
+  34          void keydeal13();       //关门
+  35          void keydeal14();       //开门
+  36          void keyscan();         //键盘扫描函数
+  37          void init();    //初始化函数
+  38          
+  39          /********************延时一毫秒函数**************/ 
+  40          void delay_xs(uint x)
+  41          {   
+  42   1              uint i,j;
+  43   1              for(i=x;i>0;i--)
+  44   1              for(j=110;j>0;j--)
+  45   1              ;
+  46   1      }
+  47          /*********************液晶写数据函数******************/
+  48          void writedate(uchar date) //写命令
+  49          {
+  50   1              P0=date;
+  51   1              rs=1;
+  52   1              lcden=0;
+  53   1              delay_xs(10);
+  54   1              lcden=1;
+  55   1              delay_xs(10);
+C51 COMPILER V9.56.0.0   MENSUOMIMA                                                        07/30/2019 17:55:10 PAGE 2   
+
+  56   1              lcden=0;
+  57   1      }
+  58          /*********************液晶写命令数据函数******************/
+  59          void writecom(uchar com) //写命令
+  60          {
+  61   1              P0=com;
+  62   1              rs=0;
+  63   1              lcden=0;
+  64   1              delay_xs(10);
+  65   1              lcden=1;
+  66   1              delay_xs(10);
+  67   1              lcden=0;
+  68   1      }
+  69          
+  70          /************各按键对应处理函数***************/
+  71          /*************各按键功能*********************/
+  72          /************1-2-3-4-5-6-7-8-9-0************/
+  73          /**************数字按键*******************/
+  74          void keydeal1()                 //按键1
+  75          {
+  76   1              table[num]=1;
+  77   1              num++;
+  78   1      }
+  79          void keydeal2()                //按键2
+  80          {
+  81   1              table[num]=2;
+  82   1              num++;
+  83   1      }
+  84          void keydeal3()               //按键3
+  85          {
+  86   1              table[num]=3;
+  87   1              num++;
+  88   1      }
+  89          void keydeal4()               //按键4
+  90          {
+  91   1              table[num]=4;
+  92   1              num++;
+  93   1      }
+  94          void keydeal5()               //按键5
+  95          {
+  96   1              table[num]=5;
+  97   1              num++;
+  98   1      }
+  99          void keydeal6() //按键6
+ 100          {
+ 101   1              table[num]=6;
+ 102   1              num++;
+ 103   1      }
+ 104          void keydeal7() //按键7
+ 105          {
+ 106   1              table[num]=7;
+ 107   1              num++;
+ 108   1      }
+ 109          void keydeal8()  //按键8
+ 110          {
+ 111   1              table[num]=8;
+ 112   1              num++;
+ 113   1      }
+ 114          void keydeal9()   //按键9
+ 115          {
+ 116   1              table[num]=9;
+ 117   1              num++;
+C51 COMPILER V9.56.0.0   MENSUOMIMA                                                        07/30/2019 17:55:10 PAGE 3   
+
+ 118   1      }
+ 119          void keydeal10()   //按键10
+ 120          {
+ 121   1              table[num]=0;   
+ 122   1              num++;
+ 123   1      }
+ 124          
+ 125          /******************功能键*****************/
+ 126          /***********确定，取消，开门，关门*******/
+ 127          //确认键
+ 128          void keydeal11()  //确认键
+ 129          {
+ 130   1              uchar j,i;
+ 131   1              if(num==8)         //判断是否输入八个数字
+ 132   1              {
+ 133   2                      num=0;         //将输入数字个数清零
+ 134   2                      compare();         //进行密码比较
+ 135   2                      for(j=0;j<8;j++) //用FFFFFFFF将输入的数据清空
+ 136   2                      {
+ 137   3                              table[j]=0;
+ 138   3                      }
+ 139   2              }
+ 140   1              if(cpflog==1) //如果密码正确，标志位为1
+ 141   1              {
+ 142   2                      l1=0; //点亮开锁灯
+ 143   2                      cpflog=0; //使比较密码标志位归零
+ 144   2                      etimes=0; //使记错次数归零
+ 145   2                      IN1=1;
+ 146   2                      IN2=0;           //开始开门
+ 147   2                      delay_xs(1000);
+ 148   2                      delay_xs(1000);
+ 149   2                      delay_xs(1000);
+ 150   2                      delay_xs(1000);
+ 151   2                      IN1=0;
+ 152   2                      IN2=0;      //完成开门            
+ 153   2                      writecom(0x01); //液晶屏清空显示
+ 154   2                      writecom(0x80); //让液晶显示“please come in！”
+ 155   2                      for(j=0;j<15;j++)
+ 156   2                      {
+ 157   3                              writedate(xianshi1[j]);
+ 158   3                              delay_xs(3);
+ 159   3                      }
+ 160   2                      for(j=0;j<2;j++)  //蜂鸣器响两声提示开锁成功
+ 161   2                      {
+ 162   3                              bump=0; 
+ 163   3                              delay_xs(200);
+ 164   3                              bump=1; 
+ 165   3                              delay_xs(200);
+ 166   3                              bump=0; 
+ 167   3                              delay_xs(200);
+ 168   3                              bump=1; 
+ 169   3                              delay_xs(200);
+ 170   3                              bump=0;
+ 171   3                      }
+ 172   2                      writecom(0x01); 
+ 173   2                      writecom(0x80);//清屏
+ 174   2                      for(i=0;i<15;i++)                                 //显示“close the door”
+ 175   2                      {       
+ 176   3                              writedate(xianshi2[i]); 
+ 177   3                      } 
+ 178   2                      mimaqueren=1;                     //关门标志置一，等待关门
+ 179   2                      while(s==0)                              //等待关门
+C51 COMPILER V9.56.0.0   MENSUOMIMA                                                        07/30/2019 17:55:10 PAGE 4   
+
+ 180   2                      {
+ 181   3                              keyscan();                      //键盘扫描，等待按下关门键
+ 182   3                              l1=~l1;
+ 183   3                              delay_xs(100);  
+ 184   3                      }
+ 185   2                      s=0;
+ 186   2                      mimaqueren=0;   //关门标志置零，开始关门
+ 187   2                      keydeal13();    //关门
+ 188   2              }
+ 189   1              else //否则密码错误，执行密码错误指令
+ 190   1              {
+ 191   2                      num=0; //将输入数据个数清零
+ 192   2                      etimes++; //记录错误次数加1 
+ 193   2                      for(j=0;j<8;j++)  //清空修改密码输入数据
+ 194   2                      { 
+ 195   3                              table[j]=0x0f; 
+ 196   3                      }
+ 197   2                      if(etimes==1)  //如果输错一次
+ 198   2                      {
+ 199   3                              writecom(0x01);   //清屏
+ 200   3                              writecom(0x80);
+ 201   3                              for(j=0;j<14;j++)   //显示first error
+ 202   3                              { 
+ 203   4                                      writedate(xianshi5[j]); 
+ 204   4                              }
+ 205   3                              delay_xs(2000);   //延时两秒
+ 206   3                              writecom(0xc);
+ 207   3                              writecom(0x80);
+ 208   3                              for(j=0;j<16;j++)   //第一行显示input passsword
+ 209   3                              {
+ 210   4                                      writedate(xianshi0[j]); 
+ 211   4                                      delay_xs(5);
+ 212   4                              }   
+ 213   3                              writecom(0x80+0x40+4); //第二行显示--------
+ 214   3                              for(j=0;j<8;j++) 
+ 215   3                              {
+ 216   4                                      writedate('-'); 
+ 217   4                              }
+ 218   3                      }
+ 219   2                      if(etimes==2)   //如果输错两次
+ 220   2                      {
+ 221   3                              writecom(0x01); 
+ 222   3                              writecom(0x80);
+ 223   3                              for(j=0;j<15;j++)   //显示second error
+ 224   3                              {
+ 225   4                                      writedate(xianshi6[j]);
+ 226   4                              }
+ 227   3                              delay_xs(2000);   //延时两秒
+ 228   3                              writecom(0xc);
+ 229   3                              writecom(0x80);
+ 230   3                              for(j=0;j<16;j++) //第一行显示input passsword
+ 231   3                              {
+ 232   4                                      writedate(xianshi0[j]); 
+ 233   4                                      delay_xs(5);
+ 234   4                              }
+ 235   3                              writecom(0x80+0x40+4);
+ 236   3                              for(j=0;j<8;j++) //第二行显示--------
+ 237   3                              {
+ 238   4                                      writedate('-');
+ 239   4                              }
+ 240   3                      }
+ 241   2                      if(etimes==3) //如果输错三次
+C51 COMPILER V9.56.0.0   MENSUOMIMA                                                        07/30/2019 17:55:10 PAGE 5   
+
+ 242   2                      {
+ 243   3                              writecom(0x01);
+ 244   3                              writecom(0x80);
+ 245   3                              for(j=0;j<15;j++) //显示  third error!!
+ 246   3                              {
+ 247   4                                      writedate(xianshi7[j]);
+ 248   4                              }
+ 249   3                              writecom(0x01);
+ 250   3                              writecom(0x80);
+ 251   3                              for(j=0;j<15;j++) //显示you are thief！
+ 252   3                              {
+ 253   4                                      writedate(xianshi4[j]);
+ 254   4                              }                       
+ 255   3                              for(j=0;j<10;j++) //报警十秒钟
+ 256   3                              {
+ 257   4                                      bump=0; 
+ 258   4                                      delay_xs(500);
+ 259   4                                      bump=1; 
+ 260   4                                      delay_xs(500);
+ 261   4                              }
+ 262   3                              writecom(0x01);
+ 263   3                              writecom(0x80);
+ 264   3                              for(j=0;j<16;j++) //显示Wait a moment
+ 265   3                              {
+ 266   4                                      writedate(xianshi9[j]);
+ 267   4                              }
+ 268   3                              delay_xs(10000);                                                                                                           
+ 269   3                              init(); //初始化
+ 270   3                      }
+ 271   2              }
+ 272   1      }
+ 273          void keydeal12()           //重新输入
+ 274          {
+ 275   1              init();
+ 276   1      }
+ 277          void keydeal13()           //关门
+ 278          {
+ 279   1              uchar i;
+ 280   1              if(mimaqueren==1)
+ 281   1              {
+ 282   2                      s=1;
+ 283   2              }
+ 284   1              if(mimaqueren==0)
+ 285   1              {
+ 286   2                      IN1=0;
+ 287   2                      IN2=1;             //通电，开始关门
+ 288   2                      delay_xs(1000);
+ 289   2                      delay_xs(1000);
+ 290   2                      delay_xs(1000);
+ 291   2                      delay_xs(1000);
+ 292   2                      IN1=0;
+ 293   2                      IN2=0;                          
+ 294   2                      writecom(0x01); 
+ 295   2                      writecom(0x80);//清屏
+ 296   2                      for(i=0;i<12;i++)                                 //显示“Good bye”
+ 297   2                      {       
+ 298   3                              writedate(xianshi8[i]); 
+ 299   3                      }
+ 300   2                      for(i=0;i<4;i++)  //蜂鸣器响两声提示开锁成功
+ 301   2                      {
+ 302   3                              bump=0; 
+ 303   3                              delay_xs(200);
+C51 COMPILER V9.56.0.0   MENSUOMIMA                                                        07/30/2019 17:55:10 PAGE 6   
+
+ 304   3                              bump=1; 
+ 305   3                              delay_xs(200);
+ 306   3                              bump=0; 
+ 307   3                              delay_xs(200);
+ 308   3                              bump=1; 
+ 309   3                              delay_xs(200);
+ 310   3                              bump=0;
+ 311   3                      }
+ 312   2                      l1=0;              //ledl亮，显示可以下次正常输入
+ 313   2                      init();            //初始化，为下次开门做准备
+ 314   2              }
+ 315   1      }
+ 316          void keydeal14()                   //开门
+ 317          {
+ 318   1              uchar i,j;
+ 319   1              IN1=1;
+ 320   1              IN2=0;          
+ 321   1              delay_xs(1000);
+ 322   1              delay_xs(1000);
+ 323   1              delay_xs(1000);
+ 324   1              delay_xs(1000);
+ 325   1              IN1=0;
+ 326   1              IN2=0;
+ 327   1              delay_xs(100);
+ 328   1              IN1=0;
+ 329   1              IN2=0;             
+ 330   1              writecom(0x01); 
+ 331   1              writecom(0x80);//清屏
+ 332   1              for(i=0;i<15;i++)                                 //显示“please come in”
+ 333   1              {       
+ 334   2                      writedate(xianshi1[i]); 
+ 335   2              }
+ 336   1              delay_xs(1000);           //延时，保证门确实开开
+ 337   1              for(j=0;j<4;j++)  //蜂鸣器响两声提示开锁成功
+ 338   1              {
+ 339   2                      bump=0; 
+ 340   2                      delay_xs(200);
+ 341   2                      bump=1; 
+ 342   2                      delay_xs(200);
+ 343   2                      bump=0; 
+ 344   2                      delay_xs(200);
+ 345   2                      bump=1; 
+ 346   2                      delay_xs(200);
+ 347   2                      bump=0;
+ 348   2              }       
+ 349   1              l1=1;
+ 350   1              writecom(0x01); 
+ 351   1              writecom(0x80);//清屏
+ 352   1              for(i=0;i<15;i++)                                 //显示“close the door”
+ 353   1              {       
+ 354   2                      writedate(xianshi2[i]); 
+ 355   2              }
+ 356   1              while(P3!=0xe7);        //等待关门
+ 357   1              init();           //关门后初始化，为下次输入做准备
+ 358   1      }
+ 359          void compare() //比较密码正确与否函数
+ 360          {
+ 361   1              uchar j,i=0;
+ 362   1              for(j=0;j<8;j++)
+ 363   1              {
+ 364   2                      if(table[j]==mima[j])
+ 365   2                      {                       
+C51 COMPILER V9.56.0.0   MENSUOMIMA                                                        07/30/2019 17:55:10 PAGE 7   
+
+ 366   3                              i=i+1 ;
+ 367   3                      }
+ 368   2              }
+ 369   1              if(i==8)
+ 370   1              {
+ 371   2                      cpflog=1;        //密码正确标志置1
+ 372   2              }        
+ 373   1      }
+ 374          /******************键盘扫描函数**************************/
+ 375          void keyscan()
+ 376          {
+ 377   1              uchar temp;
+ 378   1              /**************第一行扫描********************/
+ 379   1              P3=0xfe;
+ 380   1              temp=P3&0xf0;
+ 381   1              if(temp!=0xf0)
+ 382   1              {
+ 383   2                      delay_xs(10);
+ 384   2                      if(temp!=0xf0) 
+ 385   2                              temp=P3;
+ 386   2                      switch(temp)
+ 387   2                      {
+ 388   3                              case 0xee: keydeal1(); break;
+ 389   3                              case 0xde: keydeal2(); break;
+ 390   3                              case 0xbe: keydeal3(); break;
+ 391   3                              case 0x7e: keydeal4(); break;
+ 392   3                      }
+ 393   2                      while((P3&0xf0)!=0xf0); //松手检测
+ 394   2              }
+ 395   1      /******************第二行扫描**********************/
+ 396   1              P3=0xfd;
+ 397   1              temp=P3&0xf0;
+ 398   1              if(temp!=0xf0)
+ 399   1              {
+ 400   2                      delay_xs(10);
+ 401   2                      if(temp!=0xf0) temp=P3;
+ 402   2                      switch(temp)
+ 403   2                      {
+ 404   3                              case 0xed: keydeal5(); break;
+ 405   3                              case 0xdd: keydeal6(); break;
+ 406   3                              case 0xbd: keydeal7(); break;
+ 407   3                              case 0x7d: keydeal8(); break;           
+ 408   3                      }
+ 409   2                      while((P3&0xf0)!=0xf0);   //松手检测
+ 410   2              }
+ 411   1      /*****************第三行扫描*********************/
+ 412   1              P3=0xfb; 
+ 413   1              temp=P3&0xf0;
+ 414   1              if(temp!=0xf0)
+ 415   1              {
+ 416   2              delay_xs(10);
+ 417   2              if(temp!=0xf0) 
+ 418   2              temp=P3;
+ 419   2              switch(temp)
+ 420   2              {
+ 421   3                      case 0xeb: keydeal9(); break;
+ 422   3                      case 0xdb: keydeal10(); break;
+ 423   3                      case 0xbb: keydeal11(); break;
+ 424   3                      case 0x7b: keydeal12(); break;  
+ 425   3              }
+ 426   2                      while((P3&0xf0)!=0xf0); 
+ 427   2              }
+C51 COMPILER V9.56.0.0   MENSUOMIMA                                                        07/30/2019 17:55:10 PAGE 8   
+
+ 428   1      /********************第四行扫描********************/
+ 429   1              P3=0xf7;
+ 430   1              temp=P3&0xf0;
+ 431   1              if(temp!=0xf0)
+ 432   1                      {
+ 433   2                      delay_xs(10);
+ 434   2                      if(temp!=0xf0) 
+ 435   2                      temp=P3;
+ 436   2                      switch(temp)
+ 437   2                      {
+ 438   3                              case 0xe7: keydeal13(); break;
+ 439   3                              case 0xd7: keydeal14(); break;
+ 440   3                              case 0xb7: /*keydeal15();*/ break;
+ 441   3                              case 0x77: /*keydeal16();*/ break;
+ 442   3                      }
+ 443   2                      while((P3&0xf0)!=0xf0); 
+ 444   2              }
+ 445   1      }
+ 446          /****************显示函数*************/
+ 447          void display()
+ 448          {
+ 449   1              uint c;
+ 450   1              writecom(0x80+0x40+4);
+ 451   1              for(c=0;c<num;c++)
+ 452   1              { 
+ 453   2                      writedate('*'); 
+ 454   2                      delay_xs(5); 
+ 455   2              }
+ 456   1      }
+ 457          /*******************初始化函数***********/
+ 458          void init()
+ 459          {
+ 460   1              uint a,b;
+ 461   1              bump=0;
+ 462   1              num=0;  //输入数据个数清零
+ 463   1              etimes=0;
+ 464   1              IN1=0;  //关门
+ 465   1              IN2=0;
+ 466   1              l1=0;   //关闭开锁灯
+ 467   1              delay_xs(5); 
+ 468   1              rw=0;
+ 469   1              writecom(0x38);   //显示模式设置：16×2显示，5×7点阵，8位数据接口
+ 470   1              delay_xs(20);
+ 471   1              writecom(0x0f);   //显示模式设置
+ 472   1              delay_xs(20);
+ 473   1              writecom(0x06);   //显示模式设置：光标右移，字符不移
+ 474   1              delay_xs(20);
+ 475   1              writecom(0x01);   //清屏幕指令，将以前的显示内容清除
+ 476   1              delay_xs(20);
+ 477   1              for(a=0;a<16;a++) //显示input password：
+ 478   1              {
+ 479   2                      writedate(xianshi0[a]); 
+ 480   2                      delay_xs(5);
+ 481   2              }
+ 482   1              writecom(0x80+0x40+4); //第二行显示--------
+ 483   1              for(b=0;b<8;b++)
+ 484   1              { 
+ 485   2                      writedate('-'); 
+ 486   2              } 
+ 487   1      }
+ 488          /*****************主函数******************/
+ 489          void main()
+C51 COMPILER V9.56.0.0   MENSUOMIMA                                                        07/30/2019 17:55:10 PAGE 9   
+
+ 490          {
+ 491   1              init();   //初始化
+ 492   1              while(1) //不停地对键盘和显示进行扫描
+ 493   1              {
+ 494   2                      keyscan(); //键盘扫描和密码输入处理
+ 495   2                      display(); //LCD显示
+ 496   2              }
+ 497   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   1394    ----
+   CONSTANT SIZE    =    144    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =     19       2
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =      2    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
